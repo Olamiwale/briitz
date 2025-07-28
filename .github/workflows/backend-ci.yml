@@ -8,60 +8,55 @@ permissions:
   id-token: write
   contents: read
 
-  
 jobs:
   build:
     runs-on: ubuntu-latest
 
     env:
       REGISTRY: briitzacr.azurecr.io
-      RESOURCE_GROUP: briitz_rg
-      CLUSTER_NAME: briitzaks
-      IMAGE_ID: backend
+      IMAGE_NAME: backend
 
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
-      
 
-    - name: 'Login to Azure using OIDC'
+    - name: Login to Azure using OIDC
       uses: azure/login@v1
       with:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }} 
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-
-    - name: ACR login via Azure CLI (OIDC)
+    - name: ACR login via Azure CLI
       run: az acr login --name briitzacr
-
-
-    - name: Set AKS Context
-      run: |
-          az aks get-credentials --resource-group $RESOURCE_GROUP --name $CLUSTER_NAME --overwrite-existing
-
 
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
         node-version: '18'
-        
+
     - name: Install dependencies
       run: npm ci
+      working-directory: ./backend
 
     - name: Run tests
       run: npm test
+      working-directory: ./backend
 
-    - name: Build Docker Image
-      run: docker build -t ${{ secrets.DOCKER_USERNAME }}/microservice:latest -f microservice/
-
-
-    - name: Push Docker image
+    - name: Build Docker Image with Git SHA Tag
+      id: build
       run: |
-          docker push $REGISTRY/:latest
+        IMAGE_TAG=$(git rev-parse --short=8 HEAD)
+        IMAGE_URI=$REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+        docker build -t $IMAGE_URI ./backend
+        echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+        echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
 
+    - name: Push Docker Image
+      run: docker push $IMAGE_URI
 
-    - name: Deploy to AKS
-      run: |
-          kubectl apply -f ./backend/k8s/dev/deployment.yaml
-          kubectl apply -f ./backend/k8s/dev/service.yaml  
+    - name: Upload Kubernetes Manifests as Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: k8s-manifests
+        path: backend/$IMAGE_NAME/k8s/dev/

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment dev"
+        description: "Target environment"
         required: true
         default: "dev"
       image_tag:
@@ -22,43 +22,44 @@ jobs:
     environment:
       name: ${{ github.event.inputs.environment }}
       url: https://your-account-service-url.com
-      # Requires reviewer approval if configured for prod
 
     env:
       REGISTRY: depaulacr.azurecr.io
-      RESOURCE_GROUP: de_paul_RG
-      CLUSTER_NAME: depaulaks
+      RESOURCE_GROUP: briitz_rg
+      CLUSTER_NAME: briitzaks
       SERVICE: account-service
       IMAGE_TAG: ${{ github.event.inputs.image_tag }}
       ENV: ${{ github.event.inputs.environment }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Download deployment files
-        uses: actions/download-artifact@v3
-        with:
-          name: k8s-manifests
+    - name: Download deployment files
+      uses: actions/download-artifact@v3
+      with:
+        name: k8s-manifests
+        path: ./k8s-temp/ 
 
-      - name: Azure Login (OIDC)
-        uses: azure/login@v1
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    - name: Azure Login (OIDC)
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: ACR Login
-        run: az acr login --name depaulacr
+    - name: ACR Login
+      run: az acr login --name briitzacr
 
-      - name: Set AKS Context
-        run: az aks get-credentials --resource-group $RESOURCE_GROUP --name $CLUSTER_NAME --overwrite-existing
+    - name: Set AKS Context
+      run: |
+        az aks get-credentials --resource-group $RESOURCE_GROUP --name $CLUSTER_NAME --overwrite-existing
 
-      - name: Inject image tag into Kubernetes manifest
-        run: |
-          sed -i "s|REPLACE_IMAGE|$REGISTRY/$SERVICE:$IMAGE_TAG|g" backend/$SERVICE/k8s/$ENV/deployment.yaml
+    - name: Inject image tag into Kubernetes manifest
+      run: |
+        sed -i "s|REPLACE_IMAGE|$REGISTRY/$SERVICE:$IMAGE_TAG|g" ./k8s-temp/deployment.yaml
 
-      - name: Deploy to AKS
-        run: |
-          kubectl apply -f backend/$SERVICE/k8s/$ENV/deployment.yaml
-          kubectl apply -f backend/$SERVICE/k8s/$ENV/service.yaml
+    - name: Deploy to AKS
+      run: |
+        kubectl apply -f ./k8s-temp/deployment.yaml
+        kubectl apply -f ./k8s-temp/service.yaml
