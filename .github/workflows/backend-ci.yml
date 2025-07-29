@@ -56,7 +56,7 @@ jobs:
       run: docker push $IMAGE_URI
 
     - name: Upload Kubernetes Manifests as Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: k8s-manifests
         path: backend/$IMAGE_NAME/k8s/dev/
