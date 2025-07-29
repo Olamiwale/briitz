@@ -12,10 +12,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    environment:
-      name: dev
-      url: https://your-account-service-url.com
-
     env:
       REGISTRY: depaulacr.azurecr.io
       RESOURCE_GROUP: briitz_rg
@@ -25,15 +21,7 @@ jobs:
       ENV: dev
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Download deployment files
-      uses: actions/download-artifact@v4
-      with:
-        name: k8s-manifests
-        path: ./k8s-temp/
-
+    
     - name: Azure Login (OIDC)
       uses: azure/login@v1
       with:
@@ -43,7 +31,7 @@ jobs:
 
     - name: ACR Login
       run: az acr login --name briitzacr
-
+ 
     - name: Set AKS Context
       run: |
         az aks get-credentials --resource-group $RESOURCE_GROUP --name $CLUSTER_NAME --overwrite-existing
