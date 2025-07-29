@@ -1,15 +1,8 @@
 name: Backend CD
 
 on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: "Target environment"
-        required: true
-        default: "dev"
-      image_tag:
-        description: "Docker image tag (e.g., commit SHA)"
-        required: true
+  push:
+    branches: ['main'] 
 
 permissions:
   id-token: write
@@ -20,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     environment:
-      name: ${{ github.event.inputs.environment }}
+      name: dev
       url: https://your-account-service-url.com
 
     env:
@@ -28,8 +21,8 @@ jobs:
       RESOURCE_GROUP: briitz_rg
       CLUSTER_NAME: briitzaks
       SERVICE: account-service
-      IMAGE_TAG: ${{ github.event.inputs.image_tag }}
-      ENV: ${{ github.event.inputs.environment }}
+      IMAGE_TAG: ${{ github.sha }}
+      ENV: dev
 
     steps:
     - name: Checkout code
@@ -39,7 +32,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: k8s-manifests
-        path: ./k8s-temp/ 
+        path: ./k8s-temp/
 
     - name: Azure Login (OIDC)
       uses: azure/login@v1
@@ -57,7 +50,7 @@ jobs:
 
     - name: Inject image tag into Kubernetes manifest
       run: |
-        sed -i "s|REPLACE_IMAGE|$REGISTRY/$SERVICE:$IMAGE_TAG|g" ./k8s-temp/deployment.yaml
+        sed -i "s|REPLACE_IMAGE|$REGISTRY/$SERVICE:${{ env.IMAGE_TAG }}|g" ./k8s-temp/deployment.yaml
 
     - name: Deploy to AKS
       run: |
